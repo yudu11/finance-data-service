@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: FinanceDataService
+finance:
+  data:
+    base-dir: data
+alpha-vantage:
+  base-url: https://www.alphavantage.co
+  api-key: W0I6NZZKXFK8R7V2
+yahoo-finance:
+  base-url: https://query1.finance.yahoo.com
