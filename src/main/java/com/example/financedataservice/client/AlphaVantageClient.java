@@ -68,6 +68,7 @@ public class AlphaVantageClient {
             JsonNode root = objectMapper.readTree(response.getBody());
             JsonNode series = root.path("Time Series (Daily)");
             if (series.isMissingNode()) {
+                log.error("AlphaVantage response missing time series data. Payload: {}", root.toPrettyString());
                 throw new FinanceDataClientException("AlphaVantage response missing time series data");
             }
 
