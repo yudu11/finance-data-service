@@ -46,6 +46,10 @@ public class StockConfig {
         if (configuration.getDays() <= 0) {
             throw new IllegalStateException("Stock configuration days must be greater than zero");
         }
+
+        if (configuration.getGoldDays() <= 0) {
+            throw new IllegalStateException("Stock configuration goldDays must be greater than zero");
+        }
     }
 
     public List<String> getSymbols() {
@@ -54,6 +58,10 @@ public class StockConfig {
 
     public int getDays() {
         return stockConfiguration.getDays();
+    }
+
+    public int getGoldDays() {
+        return stockConfiguration.getGoldDays();
     }
 
     public StockConfiguration getStockConfiguration() {

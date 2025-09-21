@@ -7,7 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +45,11 @@ public class AlphaVantageClient {
         this.apiKey = apiKey;
     }
 
-    public PriceData fetchLatestGoldPrice() {
+    public List<PriceData> fetchGoldPriceHistory(int days) {
+        if (days <= 0) {
+            throw new IllegalArgumentException("Days parameter must be greater than zero");
+        }
+
         String uri = UriComponentsBuilder.fromPath("/query")
             .queryParam("function", "TIME_SERIES_DAILY")
             .queryParam("symbol", "XAUUSD")
@@ -65,37 +72,35 @@ public class AlphaVantageClient {
             }
 
             Iterator<Map.Entry<String, JsonNode>> iterator = series.fields();
-            Map.Entry<String, JsonNode> latestEntry = null;
+            List<PriceData> prices = new ArrayList<>();
             while (iterator.hasNext()) {
                 Map.Entry<String, JsonNode> entry = iterator.next();
-                if (latestEntry == null) {
-                    latestEntry = entry;
-                    continue;
-                }
-                LocalDate candidateDate = LocalDate.parse(entry.getKey());
-                LocalDate currentLatestDate = LocalDate.parse(latestEntry.getKey());
-                if (candidateDate.isAfter(currentLatestDate)) {
-                    latestEntry = entry;
-                }
+                LocalDate date = LocalDate.parse(entry.getKey());
+                JsonNode values = entry.getValue();
+
+                PriceData priceData = toPriceData(date, values);
+                prices.add(priceData);
             }
 
-            if (latestEntry == null) {
+            if (prices.isEmpty()) {
                 throw new FinanceDataClientException("AlphaVantage response did not contain date entries");
             }
 
-            LocalDate date = LocalDate.parse(latestEntry.getKey());
-            JsonNode values = latestEntry.getValue();
-
-            BigDecimal open = readDecimal(values, "1. open");
-            BigDecimal high = readDecimal(values, "2. high");
-            BigDecimal low = readDecimal(values, "3. low");
-            BigDecimal close = readDecimal(values, "4. close");
-
-            return new PriceData("XAUUSD", date, open, high, low, close, null, PriceDataSource.GOLD);
+            return prices.stream()
+                .sorted(Comparator.comparing(PriceData::getDate).reversed())
+                .limit(days)
+                .sorted(Comparator.comparing(PriceData::getDate))
+                .toList();
         } catch (IOException e) {
             log.error("Failed to parse AlphaVantage response", e);
             throw new FinanceDataClientException("Failed to parse AlphaVantage response", e);
         }
+    }
+
+    public PriceData fetchLatestGoldPrice() {
+        return fetchGoldPriceHistory(1).stream()
+            .findFirst()
+            .orElseThrow(() -> new FinanceDataClientException("AlphaVantage response did not contain date entries"));
     }
 
     private BigDecimal readDecimal(JsonNode node, String fieldName) {
@@ -104,5 +109,14 @@ public class AlphaVantageClient {
             throw new FinanceDataClientException("AlphaVantage response missing field: " + fieldName);
         }
         return new BigDecimal(valueNode.asText());
+    }
+
+    private PriceData toPriceData(LocalDate date, JsonNode values) {
+        BigDecimal open = readDecimal(values, "1. open");
+        BigDecimal high = readDecimal(values, "2. high");
+        BigDecimal low = readDecimal(values, "3. low");
+        BigDecimal close = readDecimal(values, "4. close");
+
+        return new PriceData("XAUUSD", date, open, high, low, close, null, PriceDataSource.GOLD);
     }
 }

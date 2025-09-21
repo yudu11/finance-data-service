@@ -102,7 +102,7 @@ public class FinanceDataService {
             Files.createDirectories(dailyDir);
             log.info("Created data directory {}", dailyDir);
 
-            PriceData gold = alphaVantageClient.fetchLatestGoldPrice();
+            List<PriceData> goldHistory = alphaVantageClient.fetchGoldPriceHistory(stockConfig.getGoldDays());
             Map<String, List<PriceData>> stocks = new HashMap<>();
 
             if (!yahooEnabled) {
@@ -122,7 +122,7 @@ public class FinanceDataService {
                 }
             }
 
-            FinanceSnapshot snapshot = new FinanceSnapshot(today, gold, stocks);
+            FinanceSnapshot snapshot = new FinanceSnapshot(today, goldHistory, stocks);
             writeSnapshot(snapshotFile, snapshot);
             log.info("Persisted finance snapshot to {}", snapshotFile);
             return snapshotFile;
@@ -164,14 +164,21 @@ public class FinanceDataService {
                 .map(dir -> dir.resolve("finance.json"))
                 .filter(Files::exists)
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
             List<PriceData> aggregated = new ArrayList<>();
             for (Path snapshotFile : snapshotFiles) {
                 readSnapshot(snapshotFile).ifPresent(snapshot -> {
-                    PriceData gold = snapshot.getGold();
-                    if (gold != null && normalizedSymbol.equals(gold.getSymbol())) {
-                        aggregated.add(gold);
+                    List<PriceData> goldHistory = snapshot.getGoldHistory();
+                    if (!goldHistory.isEmpty()) {
+                        goldHistory.stream()
+                            .filter(priceData -> normalizedSymbol.equals(priceData.getSymbol()))
+                            .forEach(aggregated::add);
+                    } else {
+                        PriceData gold = snapshot.getGold();
+                        if (gold != null && normalizedSymbol.equals(gold.getSymbol())) {
+                            aggregated.add(gold);
+                        }
                     }
                     List<PriceData> stockData = snapshot.getStocks().get(normalizedSymbol);
                     if (stockData != null) {

@@ -15,6 +15,9 @@ public class StockConfiguration {
     @JsonProperty("days")
     private int days = 30;
 
+    @JsonProperty("goldDays")
+    private int goldDays = 1;
+
     public StockConfiguration() {
         // Jackson default constructor
     }
@@ -33,5 +36,13 @@ public class StockConfiguration {
 
     public void setDays(int days) {
         this.days = days;
+    }
+
+    public int getGoldDays() {
+        return goldDays;
+    }
+
+    public void setGoldDays(int goldDays) {
+        this.goldDays = goldDays;
     }
 }

@@ -70,10 +70,17 @@ class FinanceDataServiceTest {
     void refreshDailyData_createsSnapshotWhenMissing() throws Exception {
         when(stockConfig.getSymbols()).thenReturn(List.of("AAPL"));
         when(stockConfig.getDays()).thenReturn(30);
+        when(stockConfig.getGoldDays()).thenReturn(3);
 
-        PriceData goldPrice = new PriceData("XAUUSD", TODAY, new BigDecimal("2300"), new BigDecimal("2310"),
-            new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD);
-        when(alphaVantageClient.fetchLatestGoldPrice()).thenReturn(goldPrice);
+        List<PriceData> goldPrices = List.of(
+            new PriceData("XAUUSD", TODAY.minusDays(2), new BigDecimal("2290"), new BigDecimal("2310"),
+                new BigDecimal("2280"), new BigDecimal("2300"), null, PriceDataSource.GOLD),
+            new PriceData("XAUUSD", TODAY.minusDays(1), new BigDecimal("2305"), new BigDecimal("2320"),
+                new BigDecimal("2295"), new BigDecimal("2310"), null, PriceDataSource.GOLD),
+            new PriceData("XAUUSD", TODAY, new BigDecimal("2315"), new BigDecimal("2330"),
+                new BigDecimal("2305"), new BigDecimal("2325"), null, PriceDataSource.GOLD)
+        );
+        when(alphaVantageClient.fetchGoldPriceHistory(3)).thenReturn(goldPrices);
 
         List<PriceData> stockPrices = List.of(
             new PriceData("AAPL", TODAY.minusDays(1), new BigDecimal("180"), new BigDecimal("181"),
@@ -84,12 +91,15 @@ class FinanceDataServiceTest {
         Path snapshotPath = financeDataService.refreshDailyData();
 
         assertThat(snapshotPath).exists();
-        verify(alphaVantageClient, times(1)).fetchLatestGoldPrice();
+        verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(3);
         verify(yahooFinanceClient, times(1)).fetchHistoricalPrices("AAPL", 30);
 
         JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
         assertThat(root.get("snapshotDate").asText()).isEqualTo("2024-05-16");
         assertThat(root.path("gold").path("symbol").asText()).isEqualTo("XAUUSD");
+        assertThat(root.path("goldHistory").isArray()).isTrue();
+        assertThat(root.path("goldHistory").size()).isEqualTo(3);
+        assertThat(root.path("goldHistory").get(2).path("date").asText()).isEqualTo("2024-05-16");
         assertThat(root.path("stocks").path("AAPL")).isNotNull();
     }
 
@@ -119,15 +129,20 @@ class FinanceDataServiceTest {
             false
         );
 
-        PriceData goldPrice = new PriceData("XAUUSD", TODAY, new BigDecimal("2300"), new BigDecimal("2310"),
-            new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD);
-        when(alphaVantageClient.fetchLatestGoldPrice()).thenReturn(goldPrice);
+        when(stockConfig.getGoldDays()).thenReturn(1);
+
+        List<PriceData> goldPrices = List.of(
+            new PriceData("XAUUSD", TODAY, new BigDecimal("2300"), new BigDecimal("2310"),
+                new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD)
+        );
+        when(alphaVantageClient.fetchGoldPriceHistory(1)).thenReturn(goldPrices);
 
         Path snapshotPath = disabledService.refreshDailyData();
 
         assertThat(snapshotPath).exists();
-        verify(alphaVantageClient, times(1)).fetchLatestGoldPrice();
-        verifyNoInteractions(yahooFinanceClient, stockConfig);
+        verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(1);
+        verifyNoInteractions(yahooFinanceClient);
+        verify(stockConfig, times(1)).getGoldDays();
 
         JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
         assertThat(root.path("stocks").isObject()).isTrue();
