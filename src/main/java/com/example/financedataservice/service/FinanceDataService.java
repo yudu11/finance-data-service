@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,7 @@ public class FinanceDataService {
     private final Clock clock;
     private final ReentrantLock refreshLock = new ReentrantLock();
 
+    @Autowired
     public FinanceDataService(AlphaVantageClient alphaVantageClient,
                               YahooFinanceClient yahooFinanceClient,
                               StockConfig stockConfig,

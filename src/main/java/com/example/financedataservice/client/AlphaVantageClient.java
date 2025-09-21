@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ public class AlphaVantageClient {
     private final String apiKey;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public AlphaVantageClient(RestTemplateBuilder restTemplateBuilder,
                               ObjectMapper objectMapper,
                               @Value("${alpha-vantage.base-url}") String baseUrl,
@@ -41,14 +43,14 @@ public class AlphaVantageClient {
     }
 
     public PriceData fetchLatestGoldPrice() {
-        var uri = UriComponentsBuilder.fromUriString("/query")
+        String uri = UriComponentsBuilder.fromPath("/query")
             .queryParam("function", "TIME_SERIES_DAILY")
             .queryParam("symbol", "XAUUSD")
             .queryParam("outputsize", "full")
             .queryParam("datatype", "json")
             .queryParam("apikey", apiKey)
             .build(true)
-            .toUri();
+            .toUriString();
 
         ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {

@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -13,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
@@ -27,16 +30,23 @@ public class YahooFinanceClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
+    @Autowired
     public YahooFinanceClient(RestTemplateBuilder restTemplateBuilder,
                               ObjectMapper objectMapper,
                               @Value("${yahoo-finance.base-url}") String baseUrl) {
-        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper);
+        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper, Clock.systemUTC());
     }
 
     YahooFinanceClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
+        this(restTemplate, objectMapper, Clock.systemUTC());
+    }
+
+    YahooFinanceClient(RestTemplate restTemplate, ObjectMapper objectMapper, Clock clock) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     public List<PriceData> fetchHistoricalPrices(String symbol, int days) {
@@ -47,11 +57,15 @@ public class YahooFinanceClient {
             throw new IllegalArgumentException("Days parameter must be greater than zero");
         }
 
-        var uri = UriComponentsBuilder.fromUriString(String.format("/v8/finance/chart/%s", symbol))
-            .queryParam("range", days + "d")
+        Instant endInstant = Instant.now(clock);
+        Instant startInstant = endInstant.minus(Duration.ofDays(days));
+
+        String uri = UriComponentsBuilder.fromPath(String.format("/v8/finance/chart/%s", symbol))
+            .queryParam("period1", startInstant.getEpochSecond())
+            .queryParam("period2", endInstant.getEpochSecond())
             .queryParam("interval", "1d")
             .build(true)
-            .toUri();
+            .toUriString();
 
         ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {

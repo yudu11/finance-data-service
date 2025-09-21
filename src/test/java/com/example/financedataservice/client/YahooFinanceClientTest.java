@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.financedataservice.model.PriceData;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 class YahooFinanceClientTest {
 
     private static final String BASE_URL = "https://yahoo.example";
+    private static final Instant FIXED_INSTANT = Instant.parse("2024-05-20T00:00:00Z");
 
     private MockRestServiceServer mockServer;
     private YahooFinanceClient client;
@@ -25,7 +29,7 @@ class YahooFinanceClientTest {
     void setUp() {
         RestTemplate restTemplate = new RestTemplateBuilder().rootUri(BASE_URL).build();
         mockServer = MockRestServiceServer.bindTo(restTemplate).ignoreExpectOrder(true).build();
-        client = new YahooFinanceClient(restTemplate, new ObjectMapper());
+        client = new YahooFinanceClient(restTemplate, new ObjectMapper(), Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
     }
 
     @Test
@@ -55,7 +59,7 @@ class YahooFinanceClientTest {
             """;
 
         mockServer.expect(MockRestRequestMatchers.requestTo(
-                BASE_URL + "/v8/finance/chart/AAPL?range=5d&interval=1d"))
+                BASE_URL + "/v8/finance/chart/AAPL?period1=1715731200&period2=1716163200&interval=1d"))
             .andRespond(MockRestResponseCreators.withSuccess(body, MediaType.APPLICATION_JSON));
 
         List<PriceData> data = client.fetchHistoricalPrices("AAPL", 5);
