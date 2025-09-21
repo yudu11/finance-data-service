@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -59,7 +60,9 @@ class FinanceDataServiceTest {
             stockConfig,
             objectMapper,
             tempDir.toString(),
-            fixedClock
+            fixedClock,
+            Duration.ZERO,
+            true
         );
     }
 
@@ -100,5 +103,34 @@ class FinanceDataServiceTest {
 
         assertThat(snapshotPath).isEqualTo(existingFile);
         verifyNoInteractions(alphaVantageClient, yahooFinanceClient);
+    }
+
+    @Test
+    void refreshDailyData_skipsYahooWhenDisabled() throws Exception {
+        Clock fixedClock = Clock.fixed(Instant.parse("2024-05-16T10:00:00Z"), ZoneOffset.UTC);
+        FinanceDataService disabledService = new FinanceDataService(
+            alphaVantageClient,
+            yahooFinanceClient,
+            stockConfig,
+            objectMapper,
+            tempDir.toString(),
+            fixedClock,
+            Duration.ZERO,
+            false
+        );
+
+        PriceData goldPrice = new PriceData("XAUUSD", TODAY, new BigDecimal("2300"), new BigDecimal("2310"),
+            new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD);
+        when(alphaVantageClient.fetchLatestGoldPrice()).thenReturn(goldPrice);
+
+        Path snapshotPath = disabledService.refreshDailyData();
+
+        assertThat(snapshotPath).exists();
+        verify(alphaVantageClient, times(1)).fetchLatestGoldPrice();
+        verifyNoInteractions(yahooFinanceClient, stockConfig);
+
+        JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
+        assertThat(root.path("stocks").isObject()).isTrue();
+        assertThat(root.path("stocks").size()).isZero();
     }
 }

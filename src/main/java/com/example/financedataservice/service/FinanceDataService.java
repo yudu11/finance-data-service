@@ -8,6 +8,7 @@ import com.example.financedataservice.model.FinanceSnapshot;
 import com.example.financedataservice.model.PriceData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -44,6 +46,8 @@ public class FinanceDataService {
     private final ObjectMapper objectMapper;
     private final Path baseDirectory;
     private final Clock clock;
+    private final Duration yahooRequestDelay;
+    private final boolean yahooEnabled;
     private final ReentrantLock refreshLock = new ReentrantLock();
 
     @Autowired
@@ -51,8 +55,11 @@ public class FinanceDataService {
                               YahooFinanceClient yahooFinanceClient,
                               StockConfig stockConfig,
                               ObjectMapper objectMapper,
-                              @Value("${finance.data.base-dir:data}") String baseDirectory) {
-        this(alphaVantageClient, yahooFinanceClient, stockConfig, objectMapper, baseDirectory, Clock.systemUTC());
+                              @Value("${finance.data.base-dir:data}") String baseDirectory,
+                              @Value("${yahoo-finance.request-delay-ms:500}") long yahooRequestDelayMs,
+                              @Value("${yahoo-finance.enabled:true}") boolean yahooEnabled) {
+        this(alphaVantageClient, yahooFinanceClient, stockConfig, objectMapper, baseDirectory,
+            Clock.systemUTC(), Duration.ofMillis(Math.max(yahooRequestDelayMs, 0)), yahooEnabled);
     }
 
     FinanceDataService(AlphaVantageClient alphaVantageClient,
@@ -60,13 +67,19 @@ public class FinanceDataService {
                        StockConfig stockConfig,
                        ObjectMapper objectMapper,
                        String baseDirectory,
-                       Clock clock) {
+                       Clock clock,
+                       Duration yahooRequestDelay,
+                       boolean yahooEnabled) {
         this.alphaVantageClient = alphaVantageClient;
         this.yahooFinanceClient = yahooFinanceClient;
         this.stockConfig = stockConfig;
-        this.objectMapper = objectMapper.copy().registerModule(new JavaTimeModule());
+        this.objectMapper = objectMapper.copy()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         this.baseDirectory = Paths.get(baseDirectory);
         this.clock = clock;
+        this.yahooRequestDelay = yahooRequestDelay;
+        this.yahooEnabled = yahooEnabled;
     }
 
     public Path refreshDailyData() {
@@ -92,9 +105,21 @@ public class FinanceDataService {
             PriceData gold = alphaVantageClient.fetchLatestGoldPrice();
             Map<String, List<PriceData>> stocks = new HashMap<>();
 
-            for (String symbol : stockConfig.getSymbols()) {
-                List<PriceData> history = yahooFinanceClient.fetchHistoricalPrices(symbol, stockConfig.getDays());
-                stocks.put(symbol.toUpperCase(), history);
+            if (!yahooEnabled) {
+                log.info("Yahoo Finance integration disabled; skipping stock price retrieval");
+            } else {
+                List<String> symbols = stockConfig.getSymbols();
+                if (symbols == null) {
+                    symbols = List.of();
+                }
+                for (int i = 0; i < symbols.size(); i++) {
+                    if (i > 0) {
+                        sleepBetweenYahooCalls();
+                    }
+                    String symbol = symbols.get(i);
+                    List<PriceData> history = yahooFinanceClient.fetchHistoricalPrices(symbol, stockConfig.getDays());
+                    stocks.put(symbol.toUpperCase(), history);
+                }
             }
 
             FinanceSnapshot snapshot = new FinanceSnapshot(today, gold, stocks);
@@ -107,6 +132,18 @@ public class FinanceDataService {
             throw new IllegalStateException("Failed to refresh daily data", e);
         } finally {
             refreshLock.unlock();
+        }
+    }
+
+    private void sleepBetweenYahooCalls() {
+        if (yahooRequestDelay == null || yahooRequestDelay.isZero() || yahooRequestDelay.isNegative()) {
+            return;
+        }
+        try {
+            Thread.sleep(yahooRequestDelay.toMillis());
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while throttling Yahoo Finance requests", interruptedException);
         }
     }
 

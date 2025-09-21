@@ -9,3 +9,4 @@ alpha-vantage:
   api-key: W0I6NZZKXFK8R7V2
 yahoo-finance:
   base-url: https://query1.finance.yahoo.com
+  enabled: false

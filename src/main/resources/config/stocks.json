@@ -1,4 +1,4 @@
 {
-  "symbols": ["AAPL", "MSFT", "TSLA"],
+  "symbols": [ "TSLA"],
   "days": 30
 }
