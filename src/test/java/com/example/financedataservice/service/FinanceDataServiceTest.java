@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.example.financedataservice.client.AlphaVantageClient;
-import com.example.financedataservice.client.YahooFinanceClient;
+import com.example.financedataservice.client.TwelveDataClient;
 import com.example.financedataservice.config.StockConfig;
 import com.example.financedataservice.model.PriceData;
 import com.example.financedataservice.model.PriceDataSource;
@@ -39,7 +39,7 @@ class FinanceDataServiceTest {
     private AlphaVantageClient alphaVantageClient;
 
     @Mock
-    private YahooFinanceClient yahooFinanceClient;
+    private TwelveDataClient twelveDataClient;
 
     @Mock
     private StockConfig stockConfig;
@@ -56,7 +56,7 @@ class FinanceDataServiceTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2024-05-16T10:00:00Z"), ZoneOffset.UTC);
         financeDataService = new FinanceDataService(
             alphaVantageClient,
-            yahooFinanceClient,
+            twelveDataClient,
             stockConfig,
             objectMapper,
             tempDir.toString(),
@@ -84,15 +84,15 @@ class FinanceDataServiceTest {
 
         List<PriceData> stockPrices = List.of(
             new PriceData("AAPL", TODAY.minusDays(1), new BigDecimal("180"), new BigDecimal("181"),
-                new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.YAHOO_FINANCE)
+                new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.TWELVE_DATA)
         );
-        when(yahooFinanceClient.fetchHistoricalPrices("AAPL", 30)).thenReturn(stockPrices);
+        when(twelveDataClient.fetchHistoricalPrices("AAPL", 30)).thenReturn(stockPrices);
 
         Path snapshotPath = financeDataService.refreshDailyData();
 
         assertThat(snapshotPath).exists();
         verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(3);
-        verify(yahooFinanceClient, times(1)).fetchHistoricalPrices("AAPL", 30);
+        verify(twelveDataClient, times(1)).fetchHistoricalPrices("AAPL", 30);
 
         JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
         assertThat(root.get("snapshotDate").asText()).isEqualTo("2024-05-16");
@@ -112,15 +112,15 @@ class FinanceDataServiceTest {
         Path snapshotPath = financeDataService.refreshDailyData();
 
         assertThat(snapshotPath).isEqualTo(existingFile);
-        verifyNoInteractions(alphaVantageClient, yahooFinanceClient);
+        verifyNoInteractions(alphaVantageClient, twelveDataClient);
     }
 
     @Test
-    void refreshDailyData_skipsYahooWhenDisabled() throws Exception {
+    void refreshDailyData_skipsTwelveDataWhenDisabled() throws Exception {
         Clock fixedClock = Clock.fixed(Instant.parse("2024-05-16T10:00:00Z"), ZoneOffset.UTC);
         FinanceDataService disabledService = new FinanceDataService(
             alphaVantageClient,
-            yahooFinanceClient,
+            twelveDataClient,
             stockConfig,
             objectMapper,
             tempDir.toString(),
@@ -141,7 +141,7 @@ class FinanceDataServiceTest {
 
         assertThat(snapshotPath).exists();
         verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(1);
-        verifyNoInteractions(yahooFinanceClient);
+        verifyNoInteractions(twelveDataClient);
         verify(stockConfig, times(1)).getGoldDays();
 
         JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));

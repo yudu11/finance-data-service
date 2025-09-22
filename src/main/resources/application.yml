@@ -7,6 +7,9 @@ finance:
 alpha-vantage:
   base-url: https://www.alphavantage.co
   api-key: W0I6NZZKXFK8R7V2
-yahoo-finance:
-  base-url: https://query1.finance.yahoo.com
-  enabled: false
+twelve-data:
+  base-url: https://api.twelvedata.com
+  api-key: 58e87b1c442a464f8c10e61a77db7871
+  interval: 1day
+  enabled: true
+  request-delay-ms: 500

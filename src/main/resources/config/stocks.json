@@ -1,5 +1,5 @@
 {
-  "symbols": [ "TSLA"],
-  "days": 30,
+  "symbols": ["AAPL", "TSLA", "MSFT", "GOOGL", "NVDA", "META"],
+  "days": 300,
   "goldDays": 100
 }

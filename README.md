@@ -5,7 +5,7 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
 ## Project Structure
 - `build.gradle.kts` – Gradle build configuration using Spring Boot 3 and Java 17.
 - `src/main/java/com/example/financedataservice` – Application code organized into configuration, client, service, controller, model, and bootstrap packages.
-- `src/main/resources/config/stocks.json` – Default stock symbols and lookback days for Yahoo Finance integration.
+- `src/main/resources/config/stocks.json` – Default stock symbols and lookback days for Twelve Data integration.
 - `data/` – Generated daily snapshot files (`YYYY-MM-DD/finance.json`).
 
 ## Running Locally

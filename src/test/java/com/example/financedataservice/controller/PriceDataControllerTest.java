@@ -40,7 +40,7 @@ class PriceDataControllerTest {
             new BigDecimal("179.00"),
             new BigDecimal("180.50"),
             1000L,
-            PriceDataSource.YAHOO_FINANCE
+            PriceDataSource.TWELVE_DATA
         );
 
         when(financeDataService.getPriceDataForSymbol("AAPL"))

@@ -2,7 +2,7 @@ package com.example.financedataservice.service;
 
 import com.example.financedataservice.client.AlphaVantageClient;
 import com.example.financedataservice.client.FinanceDataClientException;
-import com.example.financedataservice.client.YahooFinanceClient;
+import com.example.financedataservice.client.TwelveDataClient;
 import com.example.financedataservice.config.StockConfig;
 import com.example.financedataservice.model.FinanceSnapshot;
 import com.example.financedataservice.model.PriceData;
@@ -41,45 +41,45 @@ public class FinanceDataService {
     private static final DateTimeFormatter FOLDER_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final AlphaVantageClient alphaVantageClient;
-    private final YahooFinanceClient yahooFinanceClient;
+    private final TwelveDataClient twelveDataClient;
     private final StockConfig stockConfig;
     private final ObjectMapper objectMapper;
     private final Path baseDirectory;
     private final Clock clock;
-    private final Duration yahooRequestDelay;
-    private final boolean yahooEnabled;
+    private final Duration twelveDataRequestDelay;
+    private final boolean twelveDataEnabled;
     private final ReentrantLock refreshLock = new ReentrantLock();
 
     @Autowired
     public FinanceDataService(AlphaVantageClient alphaVantageClient,
-                              YahooFinanceClient yahooFinanceClient,
+                              TwelveDataClient twelveDataClient,
                               StockConfig stockConfig,
                               ObjectMapper objectMapper,
                               @Value("${finance.data.base-dir:data}") String baseDirectory,
-                              @Value("${yahoo-finance.request-delay-ms:500}") long yahooRequestDelayMs,
-                              @Value("${yahoo-finance.enabled:true}") boolean yahooEnabled) {
-        this(alphaVantageClient, yahooFinanceClient, stockConfig, objectMapper, baseDirectory,
-            Clock.systemUTC(), Duration.ofMillis(Math.max(yahooRequestDelayMs, 0)), yahooEnabled);
+                              @Value("${twelve-data.request-delay-ms:500}") long twelveDataRequestDelayMs,
+                              @Value("${twelve-data.enabled:true}") boolean twelveDataEnabled) {
+        this(alphaVantageClient, twelveDataClient, stockConfig, objectMapper, baseDirectory,
+            Clock.systemUTC(), Duration.ofMillis(Math.max(twelveDataRequestDelayMs, 0)), twelveDataEnabled);
     }
 
     FinanceDataService(AlphaVantageClient alphaVantageClient,
-                       YahooFinanceClient yahooFinanceClient,
+                       TwelveDataClient twelveDataClient,
                        StockConfig stockConfig,
                        ObjectMapper objectMapper,
                        String baseDirectory,
                        Clock clock,
-                       Duration yahooRequestDelay,
-                       boolean yahooEnabled) {
+                       Duration twelveDataRequestDelay,
+                       boolean twelveDataEnabled) {
         this.alphaVantageClient = alphaVantageClient;
-        this.yahooFinanceClient = yahooFinanceClient;
+        this.twelveDataClient = twelveDataClient;
         this.stockConfig = stockConfig;
         this.objectMapper = objectMapper.copy()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         this.baseDirectory = Paths.get(baseDirectory);
         this.clock = clock;
-        this.yahooRequestDelay = yahooRequestDelay;
-        this.yahooEnabled = yahooEnabled;
+        this.twelveDataRequestDelay = twelveDataRequestDelay;
+        this.twelveDataEnabled = twelveDataEnabled;
     }
 
     public Path refreshDailyData() {
@@ -105,8 +105,8 @@ public class FinanceDataService {
             List<PriceData> goldHistory = alphaVantageClient.fetchGoldPriceHistory(stockConfig.getGoldDays());
             Map<String, List<PriceData>> stocks = new HashMap<>();
 
-            if (!yahooEnabled) {
-                log.info("Yahoo Finance integration disabled; skipping stock price retrieval");
+            if (!twelveDataEnabled) {
+                log.info("Twelve Data integration disabled; skipping stock price retrieval");
             } else {
                 List<String> symbols = stockConfig.getSymbols();
                 if (symbols == null) {
@@ -114,10 +114,10 @@ public class FinanceDataService {
                 }
                 for (int i = 0; i < symbols.size(); i++) {
                     if (i > 0) {
-                        sleepBetweenYahooCalls();
+                        sleepBetweenTwelveDataCalls();
                     }
                     String symbol = symbols.get(i);
-                    List<PriceData> history = yahooFinanceClient.fetchHistoricalPrices(symbol, stockConfig.getDays());
+                    List<PriceData> history = twelveDataClient.fetchHistoricalPrices(symbol, stockConfig.getDays());
                     stocks.put(symbol.toUpperCase(), history);
                 }
             }
@@ -135,15 +135,15 @@ public class FinanceDataService {
         }
     }
 
-    private void sleepBetweenYahooCalls() {
-        if (yahooRequestDelay == null || yahooRequestDelay.isZero() || yahooRequestDelay.isNegative()) {
+    private void sleepBetweenTwelveDataCalls() {
+        if (twelveDataRequestDelay == null || twelveDataRequestDelay.isZero() || twelveDataRequestDelay.isNegative()) {
             return;
         }
         try {
-            Thread.sleep(yahooRequestDelay.toMillis());
+            Thread.sleep(twelveDataRequestDelay.toMillis());
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while throttling Yahoo Finance requests", interruptedException);
+            throw new IllegalStateException("Interrupted while throttling Twelve Data requests", interruptedException);
         }
     }
 
