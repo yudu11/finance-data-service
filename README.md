@@ -17,6 +17,36 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
    ```
    On startup the app downloads gold and stock data for the current day (if not already stored).
 
+## Docker Usage
+### Prerequisites
+- Docker Desktop (or Docker Engine) is running locally.
+- (Optional) Logged in to your Docker registry (`docker login`).
+
+### Build, Push & Run via Script
+Use the helper script to build the JAR, create the Docker image, optionally push it, and start the local container:
+```bash
+./docker_build_run.sh
+```
+Environment variables:
+- `IMAGE_TAG` (default `finance-data-service:latest`)
+- `REMOTE_IMAGE` (default `docker.io/username/finance-data-service:latest`)
+- `CONTAINER_NAME` (default `finance-data-service`)
+- `ENV_FILE` path to load environment variables into the container
+- `PUSH_IMAGE` (`true` by default). Set to `false` to skip pushing while still running the local image.
+
+### Manual Docker Commands
+```bash
+# Build local image
+docker build -t finance-data-service:latest .
+
+# Push to registry
+docker tag finance-data-service:latest docker.io/username/finance-data-service:latest
+docker push docker.io/username/finance-data-service:latest
+
+# Run locally
+docker run -d -p 8080:8080 --restart unless-stopped --name finance-data-service finance-data-service:latest
+```
+
 ## API Usage
 Retrieve historical prices for a symbol (case-insensitive):
 ```bash

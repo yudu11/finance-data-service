@@ -1,0 +1,10 @@
+# Ignore most build artifacts and local tooling directories
+build/**
+!build/libs/
+!build/libs/*.jar
+.gradle/
+.git/
+.idea/
+*.iml
+data/
+.DS_Store
