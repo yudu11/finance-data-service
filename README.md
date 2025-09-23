@@ -6,7 +6,7 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
 - `build.gradle.kts` – Gradle build configuration using Spring Boot 3 and Java 17.
 - `src/main/java/com/example/financedataservice` – Application code organized into configuration, client, service, controller, model, and bootstrap packages.
 - `src/main/resources/config/stocks.json` – Default stock symbols and lookback days for Twelve Data integration.
-- `data/` – Generated daily snapshot files (`YYYY-MM-DD/finance.json`).
+- `data/` – Per-symbol JSON histories persisted on disk (`{SYMBOL}.json`).
 
 ## Running Locally
 1. Ensure JDK 17+ and Gradle or the Gradle Wrapper (`./gradlew`) are available.
@@ -33,6 +33,7 @@ Environment variables:
 - `CONTAINER_NAME` (default `finance-data-service`)
 - `ENV_FILE` path to load environment variables into the container
 - `PUSH_IMAGE` (`true` by default). Set to `false` to skip pushing while still running the local image.
+- `DATA_DIR` host folder to bind mount at `/app/data` (default `${PWD}/data`).
 
 ### Manual Docker Commands
 ```bash
@@ -43,8 +44,13 @@ docker build -t finance-data-service:latest .
 docker tag finance-data-service:latest docker.io/username/finance-data-service:latest
 docker push docker.io/username/finance-data-service:latest
 
-# Run locally
-docker run -d -p 8080:8080 --restart unless-stopped --name finance-data-service finance-data-service:latest
+# Run locally (persisting data under ./data)
+mkdir -p data
+docker run -d -p 8080:8080 --restart unless-stopped \
+  -v "$(pwd)/data:/app/data" \
+  -e FINANCE_DATA_BASE_DIR=/app/data \
+  --name finance-data-service \
+  finance-data-service:latest
 ```
 
 ## API Usage
@@ -65,6 +71,6 @@ The suite covers configuration loading, HTTP clients (via mock server), service 
 ## Manual Verification Checklist
 1. Clean build and tests: `./gradlew clean test`
 2. Start service: `./gradlew bootRun`
-3. Confirm snapshot creation under `data/<today>/finance.json`
+3. Confirm each symbol has an updated history file under `data/<symbol>.json`
 4. Query REST endpoint for configured symbols and verify HTTP 200 + expected data
 5. Re-run boot to confirm idempotent behavior (no duplicate API calls when file exists)

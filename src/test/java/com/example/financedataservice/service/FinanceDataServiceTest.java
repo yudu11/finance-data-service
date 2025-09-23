@@ -11,24 +11,21 @@ import com.example.financedataservice.client.TwelveDataClient;
 import com.example.financedataservice.config.StockConfig;
 import com.example.financedataservice.model.PriceData;
 import com.example.financedataservice.model.PriceDataSource;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.example.financedataservice.model.SymbolPriceHistory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(MockitoExtension.class)
 class FinanceDataServiceTest {
@@ -53,30 +50,26 @@ class FinanceDataServiceTest {
 
     @BeforeEach
     void setUp() {
-        Clock fixedClock = Clock.fixed(Instant.parse("2024-05-16T10:00:00Z"), ZoneOffset.UTC);
         financeDataService = new FinanceDataService(
             alphaVantageClient,
             twelveDataClient,
             stockConfig,
             objectMapper,
             tempDir.toString(),
-            fixedClock,
             Duration.ZERO,
             true
         );
     }
 
     @Test
-    void refreshDailyData_createsSnapshotWhenMissing() throws Exception {
+    void refreshDailyData_persistsPerSymbolFiles() throws Exception {
         when(stockConfig.getSymbols()).thenReturn(List.of("AAPL"));
         when(stockConfig.getDays()).thenReturn(30);
         when(stockConfig.getGoldDays()).thenReturn(3);
 
         List<PriceData> goldPrices = List.of(
-            new PriceData("XAUUSD", TODAY.minusDays(2), new BigDecimal("2290"), new BigDecimal("2310"),
-                new BigDecimal("2280"), new BigDecimal("2300"), null, PriceDataSource.GOLD),
-            new PriceData("XAUUSD", TODAY.minusDays(1), new BigDecimal("2305"), new BigDecimal("2320"),
-                new BigDecimal("2295"), new BigDecimal("2310"), null, PriceDataSource.GOLD),
+            new PriceData("XAUUSD", TODAY.minusDays(1), new BigDecimal("2300"), new BigDecimal("2310"),
+                new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD),
             new PriceData("XAUUSD", TODAY, new BigDecimal("2315"), new BigDecimal("2330"),
                 new BigDecimal("2305"), new BigDecimal("2325"), null, PriceDataSource.GOLD)
         );
@@ -84,68 +77,103 @@ class FinanceDataServiceTest {
 
         List<PriceData> stockPrices = List.of(
             new PriceData("AAPL", TODAY.minusDays(1), new BigDecimal("180"), new BigDecimal("181"),
-                new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.TWELVE_DATA)
+                new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.TWELVE_DATA),
+            new PriceData("AAPL", TODAY, new BigDecimal("181"), new BigDecimal("182"),
+                new BigDecimal("180"), new BigDecimal("181.5"), 1200L, PriceDataSource.TWELVE_DATA)
         );
         when(twelveDataClient.fetchHistoricalPrices("AAPL", 30)).thenReturn(stockPrices);
 
-        Path snapshotPath = financeDataService.refreshDailyData();
+        Path resultPath = financeDataService.refreshDailyData();
 
-        assertThat(snapshotPath).exists();
+        assertThat(resultPath).isEqualTo(tempDir);
+        Path goldFile = tempDir.resolve("XAUUSD.json");
+        Path stockFile = tempDir.resolve("AAPL.json");
+        assertThat(goldFile).exists();
+        assertThat(stockFile).exists();
+
+        SymbolPriceHistory goldHistory = objectMapper.readValue(goldFile.toFile(), SymbolPriceHistory.class);
+        assertThat(goldHistory.getSymbol()).isEqualTo("XAUUSD");
+        assertThat(goldHistory.getPrices()).hasSize(2);
+        assertThat(goldHistory.getPrices().get(1).getClose()).isEqualTo(new BigDecimal("2325"));
+
+        SymbolPriceHistory stockHistory = objectMapper.readValue(stockFile.toFile(), SymbolPriceHistory.class);
+        assertThat(stockHistory.getSymbol()).isEqualTo("AAPL");
+        assertThat(stockHistory.getPrices()).hasSize(2);
+        assertThat(stockHistory.getPrices().get(0).getOpen()).isEqualTo(new BigDecimal("180"));
+
         verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(3);
         verify(twelveDataClient, times(1)).fetchHistoricalPrices("AAPL", 30);
-
-        JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
-        assertThat(root.get("snapshotDate").asText()).isEqualTo("2024-05-16");
-        assertThat(root.path("gold").path("symbol").asText()).isEqualTo("XAUUSD");
-        assertThat(root.path("goldHistory").isArray()).isTrue();
-        assertThat(root.path("goldHistory").size()).isEqualTo(3);
-        assertThat(root.path("goldHistory").get(2).path("date").asText()).isEqualTo("2024-05-16");
-        assertThat(root.path("stocks").path("AAPL")).isNotNull();
     }
 
     @Test
-    void refreshDailyData_skipsWhenFileExists() throws Exception {
-        Path existingFile = tempDir.resolve("2024-05-16").resolve("finance.json");
-        Files.createDirectories(existingFile.getParent());
-        Files.writeString(existingFile, "{}" );
+    void refreshDailyData_appendsOnlyNewEntries() throws Exception {
+        when(stockConfig.getSymbols()).thenReturn(List.of("AAPL"));
+        when(stockConfig.getDays()).thenReturn(30);
+        when(stockConfig.getGoldDays()).thenReturn(2);
 
-        Path snapshotPath = financeDataService.refreshDailyData();
+        PriceData existing = new PriceData("AAPL", TODAY.minusDays(1), new BigDecimal("180"), new BigDecimal("181"),
+            new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.TWELVE_DATA);
+        SymbolPriceHistory existingHistory = new SymbolPriceHistory("AAPL", List.of(existing));
+        objectMapper.writerWithDefaultPrettyPrinter()
+            .writeValue(tempDir.resolve("AAPL.json").toFile(), existingHistory);
 
-        assertThat(snapshotPath).isEqualTo(existingFile);
-        verifyNoInteractions(alphaVantageClient, twelveDataClient);
+        List<PriceData> fresh = List.of(
+            existing,
+            new PriceData("AAPL", TODAY, new BigDecimal("181"), new BigDecimal("183"),
+                new BigDecimal("180.5"), new BigDecimal("182.5"), 1100L, PriceDataSource.TWELVE_DATA)
+        );
+        when(alphaVantageClient.fetchGoldPriceHistory(2)).thenReturn(List.of(
+            new PriceData("XAUUSD", TODAY.minusDays(1), new BigDecimal("2300"), new BigDecimal("2310"),
+                new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD)
+        ));
+        when(twelveDataClient.fetchHistoricalPrices("AAPL", 30)).thenReturn(fresh);
+
+        financeDataService.refreshDailyData();
+
+        SymbolPriceHistory updatedHistory = objectMapper.readValue(tempDir.resolve("AAPL.json").toFile(), SymbolPriceHistory.class);
+        assertThat(updatedHistory.getPrices()).hasSize(2);
+        assertThat(updatedHistory.getPrices().get(1).getDate()).isEqualTo(TODAY);
     }
 
     @Test
     void refreshDailyData_skipsTwelveDataWhenDisabled() throws Exception {
-        Clock fixedClock = Clock.fixed(Instant.parse("2024-05-16T10:00:00Z"), ZoneOffset.UTC);
         FinanceDataService disabledService = new FinanceDataService(
             alphaVantageClient,
             twelveDataClient,
             stockConfig,
             objectMapper,
             tempDir.toString(),
-            fixedClock,
             Duration.ZERO,
             false
         );
 
         when(stockConfig.getGoldDays()).thenReturn(1);
-
-        List<PriceData> goldPrices = List.of(
+        when(alphaVantageClient.fetchGoldPriceHistory(1)).thenReturn(List.of(
             new PriceData("XAUUSD", TODAY, new BigDecimal("2300"), new BigDecimal("2310"),
                 new BigDecimal("2290"), new BigDecimal("2305"), null, PriceDataSource.GOLD)
-        );
-        when(alphaVantageClient.fetchGoldPriceHistory(1)).thenReturn(goldPrices);
+        ));
 
-        Path snapshotPath = disabledService.refreshDailyData();
+        disabledService.refreshDailyData();
 
-        assertThat(snapshotPath).exists();
         verify(alphaVantageClient, times(1)).fetchGoldPriceHistory(1);
         verifyNoInteractions(twelveDataClient);
-        verify(stockConfig, times(1)).getGoldDays();
+        assertThat(Files.exists(tempDir.resolve("XAUUSD.json"))).isTrue();
+    }
 
-        JsonNode root = objectMapper.readTree(Files.newInputStream(snapshotPath));
-        assertThat(root.path("stocks").isObject()).isTrue();
-        assertThat(root.path("stocks").size()).isZero();
+    @Test
+    void getPriceDataForSymbol_readsFromDiskWhenCacheEmpty() throws Exception {
+        PriceData first = new PriceData("AAPL", TODAY.minusDays(1), new BigDecimal("180"), new BigDecimal("181"),
+            new BigDecimal("179"), new BigDecimal("180.5"), 1000L, PriceDataSource.TWELVE_DATA);
+        PriceData second = new PriceData("AAPL", TODAY, new BigDecimal("181"), new BigDecimal("182"),
+            new BigDecimal("180"), new BigDecimal("181.5"), 1200L, PriceDataSource.TWELVE_DATA);
+        SymbolPriceHistory cached = new SymbolPriceHistory("AAPL", List.of(first, second));
+        objectMapper.writerWithDefaultPrettyPrinter()
+            .writeValue(tempDir.resolve("AAPL.json").toFile(), cached);
+
+        List<PriceData> result = financeDataService.getPriceDataForSymbol("aapl");
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getDate()).isEqualTo(TODAY.minusDays(1));
+        assertThat(result.get(1).getDate()).isEqualTo(TODAY);
     }
 }

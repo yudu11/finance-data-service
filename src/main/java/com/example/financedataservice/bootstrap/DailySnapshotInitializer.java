@@ -22,10 +22,10 @@ public class DailySnapshotInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            Path snapshotPath = financeDataService.refreshDailyData();
-            log.info("Daily finance snapshot ready at {}", snapshotPath);
+            Path datasetPath = financeDataService.refreshDailyData();
+            log.info("Price data cache initialized. Persisted data stored under {}", datasetPath);
         } catch (Exception ex) {
-            log.error("Failed to initialize daily finance snapshot", ex);
+            log.error("Failed to initialize price data cache", ex);
         }
     }
 }

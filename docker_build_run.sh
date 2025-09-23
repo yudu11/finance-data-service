@@ -11,6 +11,10 @@ PUSH_IMAGE="${PUSH_IMAGE:-true}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+DATA_DIR="${DATA_DIR:-${PROJECT_ROOT}/data}"
+mkdir -p "$DATA_DIR"
+printf '\n==> Using data directory %s (bind-mounted to /app/data)\n' "$DATA_DIR"
+
 printf '\n==> Building Gradle project...\n'
 ./gradlew clean build
 
@@ -34,6 +38,7 @@ fi
 
 printf '\n==> Starting container %s from local image %s...\n' "$CONTAINER_NAME" "$IMAGE_TAG"
 run_args=(-d --restart unless-stopped -p 8080:8080 --name "$CONTAINER_NAME")
+run_args+=(-v "$DATA_DIR:/app/data")
 if [[ -n "$ENV_FILE" ]]; then
     if [[ -f "$ENV_FILE" ]]; then
         run_args+=(--env-file "$ENV_FILE")
