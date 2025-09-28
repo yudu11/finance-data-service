@@ -35,6 +35,11 @@ Environment variables:
 - `PUSH_IMAGE` (`true` by default). Set to `false` to skip pushing while still running the local image.
 - `DATA_DIR` host folder to bind mount at `/app/data` (default `${PWD}/data`).
 
+Example without pushing to a registry:
+```bash
+PUSH_IMAGE=false ./docker_build_run.sh
+```
+
 ### Manual Docker Commands
 ```bash
 # Build local image

@@ -6,3 +6,4 @@
 /data/
 /.idea/
 *.jar
+.DS_Store
