@@ -58,6 +58,74 @@ docker run -d -p 8080:8080 --restart unless-stopped \
   finance-data-service:latest
 ```
 
+## k3d + Helm Deployment
+### Prerequisites
+- Docker Desktop (or Docker Engine)
+- k3d, kubectl, and Helm installed locally
+
+### Build the application image
+Use a project-local Gradle cache to avoid permission issues while downloading the wrapper:
+```bash
+GRADLE_USER_HOME=$PWD/.gradle ./gradlew clean build
+docker build -t finance-data-service:latest .
+```
+
+### Create the k3d cluster
+Spin up a Kubernetes in Docker cluster with one server and two agents:
+```bash
+k3d cluster create finance --agents 2 --api-port 6443
+```
+
+Import the freshly built image so the cluster can pull it without a registry:
+```bash
+k3d image import finance-data-service:latest -c finance
+```
+
+Confirm connectivity:
+```bash
+kubectl config current-context    # should show k3d-finance
+kubectl get nodes                 # all nodes should be Ready
+```
+
+### Deploy with Helm
+Validate the chart (optional) and install/upgrade the release:
+```bash
+helm lint charts/finance-data-service
+helm upgrade --install finance charts/finance-data-service -n finance --create-namespace
+```
+
+Check the rollout and service details:
+```bash
+kubectl get pods -n finance
+kubectl get svc -n finance
+```
+
+If you need a packaged chart tarball for distribution:
+```bash
+helm package charts/finance-data-service
+```
+
+### Run the application inside k3d
+The NodePort service publishes port 8080 inside the cluster. To reach it from your workstation, forward the port through kubectl and keep the tunnel open while testing:
+```bash
+kubectl port-forward svc/finance-finance-data-service 8080:8080 -n finance
+# In a second terminal
+curl "http://localhost:8080/getPriceData?symbol=AAPL"
+```
+
+You can also verify networking from within the k3d Docker network without port forwarding:
+```bash
+docker run --rm --network k3d-finance curlimages/curl \
+  curl -sS 'http://k3d-finance-server-0:30080/getPriceData?symbol=AAPL'
+```
+
+### Cleanup
+When you're finished, remove the release and the cluster:
+```bash
+helm uninstall finance -n finance
+k3d cluster delete finance
+```
+
 ## API Usage
 Retrieve historical prices for a symbol (case-insensitive):
 ```bash
