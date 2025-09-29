@@ -71,10 +71,20 @@ docker build -t finance-data-service:latest .
 ```
 
 ### Create the k3d cluster
-Spin up a Kubernetes in Docker cluster with one server and two agents:
+Pick the access pattern that fits your workflow and create the cluster accordingly.
+
+**Option 1 – Port-forward access (minimal cluster command):**
 ```bash
 k3d cluster create finance --agents 2 --api-port 6443
 ```
+This keeps the cluster internal; you’ll use `kubectl port-forward` later when you need host access.
+
+**Option 2 – Direct NodePort access:**
+```bash
+k3d cluster create finance --agents 2 --api-port 6443 \
+  --port 8080:30080@loadbalancer --port 30080:30080@loadbalancer
+```
+Here k3d publishes NodePort 30080 (and 8080 for convenience) to the host so your browser can reach the service without tunneling.
 
 Import the freshly built image so the cluster can pull it without a registry:
 ```bash
@@ -106,14 +116,19 @@ helm package charts/finance-data-service
 ```
 
 ### Run the application inside k3d
-The NodePort service publishes port 8080 inside the cluster. To reach it from your workstation, forward the port through kubectl and keep the tunnel open while testing:
+If you created the cluster with Option 1, forward the service port whenever you want host access:
 ```bash
 kubectl port-forward svc/finance-finance-data-service 8080:8080 -n finance
 # In a second terminal
 curl "http://localhost:8080/getPriceData?symbol=AAPL"
 ```
 
-You can also verify networking from within the k3d Docker network without port forwarding:
+If you created the cluster with Option 2, hit the published NodePort directly:
+```bash
+curl "http://localhost:30080/getPriceData?symbol=AAPL"
+```
+
+Independent of the option, you can always verify networking from within the k3d Docker network without port forwarding:
 ```bash
 docker run --rm --network k3d-finance curlimages/curl \
   curl -sS 'http://k3d-finance-server-0:30080/getPriceData?symbol=AAPL'
