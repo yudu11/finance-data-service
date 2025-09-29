@@ -143,6 +143,14 @@ public class FinanceDataService {
         return new ArrayList<>(cache.values());
     }
 
+    public List<String> getAvailableSymbols() {
+        List<String> symbols = stockConfig.getSymbols();
+        if (symbols == null || symbols.isEmpty()) {
+            return List.of();
+        }
+        return List.copyOf(symbols);
+    }
+
     private int mergeAndPersist(String symbol, List<PriceData> freshData) throws IOException {
         if (freshData == null || freshData.isEmpty()) {
             log.debug("No data returned for symbol {}", symbol);

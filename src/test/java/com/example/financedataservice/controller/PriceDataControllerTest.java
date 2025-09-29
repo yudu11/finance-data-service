@@ -65,4 +65,14 @@ class PriceDataControllerTest {
         mockMvc.perform(get("/getPriceData"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void getAvailableSymbols_returnsConfiguredSymbols() throws Exception {
+        when(financeDataService.getAvailableSymbols()).thenReturn(List.of("AAPL", "TSLA"));
+
+        mockMvc.perform(get("/symbols"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0]").value("AAPL"))
+            .andExpect(jsonPath("$[1]").value("TSLA"));
+    }
 }

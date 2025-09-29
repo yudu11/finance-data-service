@@ -33,4 +33,10 @@ public class PriceDataController {
 
         return ResponseEntity.ok(priceData);
     }
+
+    @GetMapping("/symbols")
+    public ResponseEntity<List<String>> getAvailableSymbols() {
+        List<String> symbols = financeDataService.getAvailableSymbols();
+        return ResponseEntity.ok(symbols);
+    }
 }
