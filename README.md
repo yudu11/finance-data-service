@@ -7,6 +7,7 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
 - `src/main/java/com/example/financedataservice` – Application code organized into configuration, client, service, controller, model, and bootstrap packages.
 - `src/main/resources/config/stocks.json` – Default stock symbols and lookback days for Twelve Data integration.
 - `data/` – Per-symbol JSON histories persisted on disk (`{SYMBOL}.json`).
+- `frontend/` – React + Vite single-page app for symbol selection and price charting.
 
 ## Running Locally
 1. Ensure JDK 17+ and Gradle or the Gradle Wrapper (`./gradlew`) are available.
@@ -16,6 +17,48 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
    ./gradlew bootRun
    ```
    On startup the app downloads gold and stock data for the current day (if not already stored).
+
+## Frontend Application
+The repository hosts a React + TypeScript interface (Vite) that lets you select one or more symbols (including gold) and explore the historical price series with an interactive chart.
+
+### Key Capabilities
+- Multi-select landing page that loads available symbols from the `/symbols` endpoint
+- Optional date-range filter passed through to the chart view
+- ApexCharts-powered visualization with zooming, brushing, and shared OHLC tooltips across symbols
+
+### Local Development
+1. Ensure Node.js 18+ and npm are available.
+2. Review `frontend/.env.example` and copy it to `.env` if you need to override the default backend URL.
+3. Start the dev server (installs dependencies on first run):
+   ```bash
+   ./start_frontend.sh --api-base http://localhost:8080
+   ```
+   The UI is available at http://localhost:5173. Pass `--skip-install` to skip the automatic `npm install` step.
+
+You can also work directly inside `frontend/`:
+```bash
+cd frontend
+npm install
+npm run dev -- --host
+```
+
+### Building the Frontend Bundle
+```bash
+cd frontend
+npm install
+npm run build
+```
+The production assets emit to `frontend/dist`.
+
+### Docker Image
+Build (and optionally push) a production image that serves the compiled bundle through Nginx:
+```bash
+./docker_build_push_frontend.sh --image your-registry/finance-data-frontend:latest \
+  --api-base https://finance-data-service.example.com
+```
+- Uses `frontend/Dockerfile` and injects `VITE_API_BASE_URL` at build time.
+- Provide `--platform linux/amd64` to build multi-arch images via `docker buildx`.
+- Supply `--push-only` to skip the build and push an existing tag.
 
 ## Docker Usage
 ### Prerequisites

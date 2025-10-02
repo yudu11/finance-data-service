@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.AbstractResource;
+import org.springframework.lang.NonNull;
 
 class StockConfigTest {
 
@@ -52,11 +53,13 @@ class StockConfigTest {
         }
 
         @Override
+        @NonNull
         public String getDescription() {
             return "String-backed resource";
         }
 
         @Override
+        @NonNull
         public InputStream getInputStream() throws IOException {
             return new ByteArrayInputStream(payload.getBytes());
         }
