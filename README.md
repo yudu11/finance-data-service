@@ -51,14 +51,22 @@ npm run build
 The production assets emit to `frontend/dist`.
 
 ### Docker Image
-Build (and optionally push) a production image that serves the compiled bundle through Nginx:
+Build, push, and run the Nginx-hosted SPA with the helper script. By default it creates a
+local image tagged `finance-frontend:local`, publishes to
+`docker.io/dodo53456/finance-data-frontend:latest`, and runs a container named
+`finance-frontend` exposed on `http://localhost:3000`.
+
+Typical workflow when both backend and frontend run as containers:
 ```bash
-./docker_build_push_frontend.sh --image your-registry/finance-data-frontend:latest \
-  --api-base https://finance-data-service.example.com
+docker network create finance-app || true
+./docker_build_run.sh                             # build + run backend (attach to finance-app afterwards)
+docker network connect finance-app finance-data-service || true
+./docker_build_push_frontend.sh --backend-service finance-data-service --network finance-app
 ```
-- Uses `frontend/Dockerfile` and injects `VITE_API_BASE_URL` at build time.
-- Provide `--platform linux/amd64` to build multi-arch images via `docker buildx`.
-- Supply `--push-only` to skip the build and push an existing tag.
+- `--backend-service` rewrites the bundle to call `http://<service>:<port>` (port defaults to 8080).
+- `--api-base` can still be used directly for non-Docker endpoints (e.g. production URLs).
+- Disable registry pushes with `--no-push-remote`; skip running the container with `--no-run`.
+- Access the UI at `http://localhost:3000` (or supply `--host-port` for a different mapping).
 
 ## Docker Usage
 ### Prerequisites

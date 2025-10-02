@@ -12,7 +12,7 @@ public class WebCorsConfig implements WebMvcConfigurer {
     private final String[] allowedOrigins;
 
     public WebCorsConfig(
-        @Value("#{'${finance.cors.allowed-origins:http://localhost:5173}'.split(',')}") String[] allowedOrigins
+        @Value("#{'${finance.cors.allowed-origins:http://localhost:5173,http://localhost:3000}'.split(',')}") String[] allowedOrigins
     ) {
         this.allowedOrigins = Arrays.stream(allowedOrigins)
             .map(String::trim)
