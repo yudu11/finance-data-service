@@ -59,7 +59,7 @@ local image tagged `finance-frontend:local`, publishes to
 Typical workflow when both backend and frontend run as containers:
 ```bash
 docker network create finance-app || true
-./docker_build_run.sh                             # build + run backend (attach to finance-app afterwards)
+./docker_build_push_backend.sh                             # build + run backend (attach to finance-app afterwards)
 docker network connect finance-app finance-data-service || true
 ./docker_build_push_frontend.sh --backend-service finance-data-service --network finance-app
 ```
@@ -76,7 +76,7 @@ docker network connect finance-app finance-data-service || true
 ### Build, Push & Run via Script
 Use the helper script to build the JAR, create the Docker image, optionally push it, and start the local container:
 ```bash
-./docker_build_run.sh
+./docker_build_push_backend.sh
 ```
 Environment variables:
 - `IMAGE_TAG` (default `finance-data-service:latest`)
@@ -88,7 +88,7 @@ Environment variables:
 
 Example without pushing to a registry:
 ```bash
-PUSH_IMAGE=false ./docker_build_run.sh
+PUSH_IMAGE=false ./docker_build_push_backend.sh
 ```
 
 ### Manual Docker Commands

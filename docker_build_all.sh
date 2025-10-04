@@ -72,7 +72,7 @@ fi
 echo "\n==> Building and running backend"
 PUSH_IMAGE="$PUSH_TO_REMOTE" \
 CONTAINER_NAME="$BACKEND_CONTAINER_NAME" \
-./docker_build_run.sh
+./docker_build_push_backend.sh
 
 echo "==> Attaching backend container to network $NETWORK_NAME"
 docker network connect "$NETWORK_NAME" "$BACKEND_CONTAINER_NAME" 2>/dev/null || true
