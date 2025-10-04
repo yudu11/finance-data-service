@@ -192,6 +192,43 @@ helm uninstall finance -n finance
 k3d cluster delete finance
 ```
 
+## LocalStack Secrets Manager Scripts
+Three helper scripts under `localstack/` walk through bringing up LocalStack with Secrets Manager, seeding a secret, and verifying access. They default to the typical LocalStack credentials (`test` / `test`) and edge port `4566`, but you can override any setting via environment variables before running a script.
+
+1. Start or restart the container (uses `docker compose` under the hood):
+   ```bash
+   ./localstack/step1_start_localstack.sh
+   ```
+   - Overrides: `LOCALSTACK_CONTAINER_NAME`, `LOCALSTACK_IMAGE`, `LOCALSTACK_NETWORK`, `LOCALSTACK_NETWORK_EXTERNAL`, `LOCALSTACK_SERVICES`, `LOCALSTACK_EDGE_PORT`, `LOCALSTACK_DEBUG`, `LOCALSTACK_VOLUME_NAME`, `LOCALSTACK_COMPOSE_PROJECT`, `AWS_REGION`.
+   - Example (attach to k3d network as an external bridge that will be created if missing):
+     ```bash
+     LOCALSTACK_NETWORK=k3d-finance \
+     LOCALSTACK_NETWORK_EXTERNAL=true \
+     ./localstack/step1_start_localstack.sh
+     ```
+
+2. Create or update a secret value:
+   ```bash
+   ./localstack/step2_seed_secret.sh
+   ```
+   - Overrides: `LOCALSTACK_SECRET_NAME`, `LOCALSTACK_SECRET_DESCRIPTION`, `LOCALSTACK_SECRET_STRING`, `LOCALSTACK_SECRET_FILE`, `LOCALSTACK_ENDPOINT`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+   - Example (load payload from file):
+     ```bash
+     LOCALSTACK_SECRET_FILE=secrets/backend.json ./localstack/step2_seed_secret.sh
+     ```
+
+3. Retrieve the secret to confirm connectivity:
+   ```bash
+   ./localstack/step3_verify_secret.sh
+   ```
+   - Overrides match step 2 (endpoint, region, credentials, secret name).
+   - Example (custom endpoint while running inside k3d):
+     ```bash
+     LOCALSTACK_ENDPOINT=http://host.k3d.internal:4566 ./localstack/step3_verify_secret.sh
+     ```
+
+The scripts rely on the AWS CLI and Docker. Install them first (`brew install awscli` on macOS, or download from the official installers) and ensure the Docker daemon is running.
+
 ## API Usage
 Retrieve historical prices for a symbol (case-insensitive):
 ```bash

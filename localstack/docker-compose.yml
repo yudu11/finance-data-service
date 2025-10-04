@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  localstack:
+    image: ${LOCALSTACK_IMAGE:-localstack/localstack:latest}
+    container_name: ${LOCALSTACK_CONTAINER_NAME:-localstack-main}
+    environment:
+      - SERVICES=${LOCALSTACK_SERVICES:-secretsmanager}
+      - EDGE_PORT=${LOCALSTACK_EDGE_PORT:-4566}
+      - DEBUG=${LOCALSTACK_DEBUG:-0}
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
+    ports:
+      - "${LOCALSTACK_EDGE_PORT:-4566}:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "awslocal", "secretsmanager", "list-secrets"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - localstack
+
+volumes:
+  localstack-data:
+    name: ${LOCALSTACK_VOLUME_NAME:-localstack-data}
+
+networks:
+  localstack:
+    name: ${LOCALSTACK_NETWORK:-localstack-net}
+    external: ${LOCALSTACK_NETWORK_EXTERNAL:-false}
