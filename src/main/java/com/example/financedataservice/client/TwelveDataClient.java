@@ -1,5 +1,6 @@
 package com.example.financedataservice.client;
 
+import com.example.financedataservice.config.ApiKeyProvider;
 import com.example.financedataservice.model.PriceData;
 import com.example.financedataservice.model.PriceDataSource;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -45,9 +46,10 @@ public class TwelveDataClient {
     public TwelveDataClient(RestTemplateBuilder restTemplateBuilder,
                             ObjectMapper objectMapper,
                             @Value("${twelve-data.base-url}") String baseUrl,
-                            @Value("${twelve-data.api-key}") String apiKey,
+                            ApiKeyProvider apiKeyProvider,
                             @Value("${twelve-data.interval:1day}") String interval) {
-        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper, Clock.systemUTC(), apiKey, interval);
+        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper, Clock.systemUTC(),
+            apiKeyProvider.getTwelveDataApiKey(), interval);
     }
 
     TwelveDataClient(RestTemplate restTemplate,

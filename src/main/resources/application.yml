@@ -6,10 +6,19 @@ finance:
     base-dir: data
 alpha-vantage:
   base-url: https://www.alphavantage.co
-  api-key: W0I6NZZKXFK8R7V2
+  api-key: ${ALPHA_VANTAGE_API_KEY:}
 twelve-data:
   base-url: https://api.twelvedata.com
-  api-key: 58e87b1c442a464f8c10e61a77db7871
+  api-key: ${TWELVE_DATA_API_KEY:}
   interval: 1day
   enabled: true
   request-delay-ms: 500
+aws:
+  secrets-manager:
+    enabled: true
+    region: us-east-1
+    endpoint: http://localhost:4566
+    access-key: test
+    secret-key: test
+    alpha-vantage-secret-name: finance/backend/alpha-vantage/api-key
+    twelve-data-secret-name: finance/backend/twelve-data/api-key

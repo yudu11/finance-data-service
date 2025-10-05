@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.example.financedataservice.config.ApiKeyProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -35,8 +36,8 @@ public class AlphaVantageClient {
     public AlphaVantageClient(RestTemplateBuilder restTemplateBuilder,
                               ObjectMapper objectMapper,
                               @Value("${alpha-vantage.base-url}") String baseUrl,
-                              @Value("${alpha-vantage.api-key}") String apiKey) {
-        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper, apiKey);
+                              ApiKeyProvider apiKeyProvider) {
+        this(restTemplateBuilder.rootUri(baseUrl).build(), objectMapper, apiKeyProvider.getAlphaVantageApiKey());
     }
 
     AlphaVantageClient(RestTemplate restTemplate, ObjectMapper objectMapper, String apiKey) {

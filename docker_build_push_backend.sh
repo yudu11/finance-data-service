@@ -47,6 +47,18 @@ if [[ -n "$ENV_FILE" ]]; then
     fi
 fi
 
+if [[ -n "${ALPHA_VANTAGE_API_KEY:-}" ]]; then
+    run_args+=(-e "ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}")
+else
+    printf 'Info: ALPHA_VANTAGE_API_KEY not set; container will rely solely on Secrets Manager.\n'
+fi
+
+if [[ -n "${TWELVE_DATA_API_KEY:-}" ]]; then
+    run_args+=(-e "TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY}")
+else
+    printf 'Info: TWELVE_DATA_API_KEY not set; container will rely solely on Secrets Manager.\n'
+fi
+
 run_args+=("$IMAGE_TAG")
 
 docker run "${run_args[@]}"

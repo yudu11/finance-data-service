@@ -12,11 +12,43 @@ FinanceDataService is a Spring Boot application that collects gold and stock pri
 ## Running Locally
 1. Ensure JDK 17+ and Gradle or the Gradle Wrapper (`./gradlew`) are available.
 2. (Optional) Update `src/main/resources/config/stocks.json` with desired symbols.
-3. Run the application:
+3. Provide API keys via AWS Secrets Manager (LocalStack in development or AWS in other environments), or configure a local profile override (see [Local Profile Fallback](#local-profile-fallback)).
+   To seed LocalStack with the sample key files bundled in this repo:
+   ```bash
+   ALPHA_VANTAGE_SECRET_FILE=localstack/sample-alpha-vantage-key.txt \
+   TWELVE_DATA_SECRET_FILE=localstack/sample-twelve-data-key.txt \
+   ./localstack/step2_seed_secret.sh
+   ```
+4. Run the application (default profile):
    ```bash
    ./gradlew bootRun
    ```
-   On startup the app downloads gold and stock data for the current day (if not already stored).
+   Or run with the local fallback profile: 
+   ```bash
+   SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+   ```
+   On startup the app downloads gold and stock data for the current day (if not already stored). The AlphaVantage and Twelve Data clients attempt to resolve API keys from Secrets Manager, falling back to local properties when necessary.
+
+### Local Profile Fallback
+For development without AWS/LocalStack, create `src/main/resources/application-local.yml` (git-ignored) with API keys and run the backend under the `local` Spring profile:
+```bash
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+```
+
+If you prefer the wrapper script, set the profile before invoking it:
+```bash
+SPRING_PROFILES_ACTIVE=local ./start_app.sh
+```
+
+Example contents:
+```yaml
+alpha-vantage:
+  api-key: W0I6NZZKXFK8R7V2
+
+twelve-data:
+  api-key: 58e87b1c442a464f8c10e61a77db7871
+```
+The application only reads these values when Secrets Manager is disabled or unavailable.
 
 ## Frontend Application
 The repository hosts a React + TypeScript interface (Vite) that lets you select one or more symbols (including gold) and explore the historical price series with an interactive chart.
@@ -85,11 +117,20 @@ Environment variables:
 - `ENV_FILE` path to load environment variables into the container
 - `PUSH_IMAGE` (`true` by default). Set to `false` to skip pushing while still running the local image.
 - `DATA_DIR` host folder to bind mount at `/app/data` (default `${PWD}/data`).
+- `ALPHA_VANTAGE_API_KEY` and `TWELVE_DATA_API_KEY` optional fallback values that the script now injects into `docker run` if set.
 
 Example without pushing to a registry:
 ```bash
 PUSH_IMAGE=false ./docker_build_push_backend.sh
 ```
+
+To supply fallback API keys via environment variables:
+```bash
+export ALPHA_VANTAGE_API_KEY=...
+export TWELVE_DATA_API_KEY=...
+./docker_build_push_backend.sh
+```
+The script forwards those values to `docker run` so the container can still authenticate if Secrets Manager is unavailable.
 
 ### Manual Docker Commands
 ```bash
@@ -193,7 +234,7 @@ k3d cluster delete finance
 ```
 
 ## LocalStack Secrets Manager Scripts
-Three helper scripts under `localstack/` walk through bringing up LocalStack with Secrets Manager, seeding a secret, and verifying access. They default to the typical LocalStack credentials (`test` / `test`) and edge port `4566`, but you can override any setting via environment variables before running a script.
+Three helper scripts under `localstack/` walk through bringing up LocalStack with Secrets Manager, seeding required secrets, and verifying access. They default to the typical LocalStack credentials (`test` / `test`) and edge port `4566`, but you can override any setting via environment variables before running a script.
 
 1. Start or restart the container (uses `docker compose` under the hood):
    ```bash
@@ -207,21 +248,23 @@ Three helper scripts under `localstack/` walk through bringing up LocalStack wit
      ./localstack/step1_start_localstack.sh
      ```
 
-2. Create or update a secret value:
+2. Create or update the AlphaVantage and Twelve Data secrets:
    ```bash
    ./localstack/step2_seed_secret.sh
    ```
-   - Overrides: `LOCALSTACK_SECRET_NAME`, `LOCALSTACK_SECRET_DESCRIPTION`, `LOCALSTACK_SECRET_STRING`, `LOCALSTACK_SECRET_FILE`, `LOCALSTACK_ENDPOINT`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
-   - Example (load payload from file):
+   - Overrides: `ALPHA_VANTAGE_SECRET_NAME`, `ALPHA_VANTAGE_SECRET_DESCRIPTION`, `ALPHA_VANTAGE_API_KEY`, `ALPHA_VANTAGE_SECRET_FILE`, `TWELVE_DATA_SECRET_NAME`, `TWELVE_DATA_SECRET_DESCRIPTION`, `TWELVE_DATA_API_KEY`, `TWELVE_DATA_SECRET_FILE`, plus `LOCALSTACK_ENDPOINT`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+   - Example (load each key from a local file):
      ```bash
-     LOCALSTACK_SECRET_FILE=secrets/backend.json ./localstack/step2_seed_secret.sh
+     ALPHA_VANTAGE_SECRET_FILE=localstack/sample-alpha-vantage-key.txt \
+     TWELVE_DATA_SECRET_FILE=localstack/sample-twelve-data-key.txt \
+     ./localstack/step2_seed_secret.sh
      ```
 
-3. Retrieve the secret to confirm connectivity:
+3. Retrieve secrets to confirm connectivity:
    ```bash
    ./localstack/step3_verify_secret.sh
    ```
-   - Overrides match step 2 (endpoint, region, credentials, secret name).
+   - Overrides: `ALPHA_VANTAGE_SECRET_NAME`, `TWELVE_DATA_SECRET_NAME`, `LOCALSTACK_ENDPOINT`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
    - Example (custom endpoint while running inside k3d):
      ```bash
      LOCALSTACK_ENDPOINT=http://host.k3d.internal:4566 ./localstack/step3_verify_secret.sh

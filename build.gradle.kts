@@ -1,6 +1,6 @@
 plugins {
-    id("org.springframework.boot") version "3.2.5"
-    id("io.spring.dependency-management") version "1.1.4"
+    id("org.springframework.boot") version "3.3.3"
+    id("io.spring.dependency-management") version "1.1.5"
     id("java")
 }
 
@@ -18,6 +18,9 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-json")
+
+    implementation(platform("software.amazon.awssdk:bom:2.25.63"))
+    implementation("software.amazon.awssdk:secretsmanager")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
