@@ -1,0 +1,20 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "finance-data-service.frontendFullname" . }}
+  labels:
+    {{- include "finance-data-service.frontendLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.frontend.service.type }}
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if and (.Values.frontend.service.nodePort) (eq .Values.frontend.service.type "NodePort") }}
+      nodePort: {{ .Values.frontend.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "finance-data-service.frontendSelectorLabels" . | nindent 4 }}
+{{- end }}

@@ -43,10 +43,35 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Frontend specific helper definitions
+*/}}
+{{- define "finance-data-service.frontendFullname" -}}
+{{- printf "%s-frontend" (include "finance-data-service.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{- define "finance-data-service.frontendName" -}}
+{{- printf "%s-frontend" (include "finance-data-service.name" .) | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{- define "finance-data-service.frontendLabels" -}}
+helm.sh/chart: {{ include "finance-data-service.chart" . }}
+{{ include "finance-data-service.frontendSelectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
 Selector labels
 */}}
 {{- define "finance-data-service.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "finance-data-service.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "finance-data-service.frontendSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "finance-data-service.frontendName" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 

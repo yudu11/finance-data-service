@@ -57,6 +57,20 @@ service:
   port: 8080
   nodePort: 30080
 
+# Environment variables for the backend container
+env:
+  - name: AWS_SECRETS_MANAGER_ENABLED
+    value: "true"
+  - name: AWS_SECRETS_MANAGER_ENDPOINT
+    value: http://host.k3d.internal:4566
+  - name: AWS_ACCESS_KEY_ID
+    value: test
+  - name: AWS_SECRET_ACCESS_KEY
+    value: test
+
+# Use this to source secrets into the backend pod
+secretEnv: []
+
 # This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ingress:
   enabled: false
@@ -111,6 +125,35 @@ httpRoute:
   #     headers:
   #     - name: version
   #       value: v2
+
+# Frontend deployment configuration
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: finance-frontend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  imagePullSecrets: []
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30081
+  env:
+    - name: VITE_API_BASE_URL
+      value: ""
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  livenessProbe: null
+  readinessProbe: null
+  volumes: []
+  volumeMounts: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

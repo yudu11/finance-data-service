@@ -163,29 +163,32 @@ docker build -t finance-data-service:latest .
 ```
 
 ### Create the k3d cluster
-Pick the access pattern that fits your workflow and create the cluster accordingly.
-
-**Option 1 – Port-forward access (minimal cluster command):**
+Create a cluster that exposes the backend and frontend NodePorts through the embedded load balancer:
 ```bash
-k3d cluster create finance --agents 2 --api-port 6443
+k3d cluster create finance-service \
+  --port 8080:30080@loadbalancer \
+  --port 3000:30081@loadbalancer
 ```
-This keeps the cluster internal; you’ll use `kubectl port-forward` later when you need host access.
 
-**Option 2 – Direct NodePort access:**
-```bash
-k3d cluster create finance --agents 2 --api-port 6443 \
-  --port 8080:30080@loadbalancer --port 30080:30080@loadbalancer
-```
-Here k3d publishes NodePort 30080 (and 8080 for convenience) to the host so your browser can reach the service without tunneling.
+Port flow once the cluster is up:
 
-Import the freshly built image so the cluster can pull it without a registry:
+| Host port | NodePort | Container port | Component |
+|-----------|----------|----------------|-----------|
+| 8080      | 30080    | 8080           | Backend Spring Boot API |
+| 3000      | 30081    | 80             | Frontend Nginx SPA |
+
+When a request hits `http://localhost:8080`, k3d forwards it to the backend service listening on NodePort `30080`, which in turn routes it to the container port `8080`. The same pattern applies to the frontend (`http://localhost:3000` → NodePort `30081` → container port `80`).
+
+Because k3d injects the DNS entry `host.k3d.internal` into each pod, any call to `http://host.k3d.internal:4566` leaves the cluster and lands on the host’s Docker bridge. That makes the backend talk to the LocalStack container binding port 4566 on your laptop exactly as if it were hitting `http://localhost:4566`.
+
+Import the freshly built images so the cluster can pull them without a registry:
 ```bash
-k3d image import finance-data-service:latest -c finance
+k3d image import finance-data-service:latest finance-frontend:latest --cluster finance-service
 ```
 
 Confirm connectivity:
 ```bash
-kubectl config current-context    # should show k3d-finance
+kubectl config current-context    # should show k3d-finance-service
 kubectl get nodes                 # all nodes should be Ready
 ```
 
@@ -196,41 +199,44 @@ helm lint charts/finance-data-service
 helm upgrade --install finance charts/finance-data-service -n finance --create-namespace
 ```
 
-Check the rollout and service details:
-```bash
-kubectl get pods -n finance
-kubectl get svc -n finance
-```
+Spring Boot resolves configuration in layers. The Helm chart injects environment variables (`AWS_SECRETS_MANAGER_ENDPOINT`, etc.) via the deployment template, and Spring’s relaxed binding maps those to `aws.secrets-manager.*` by uppercasing, replacing dots/hyphens with underscores, and stripping other punctuation (e.g. `aws.secrets-manager.endpoint` → `AWS_SECRETS_MANAGER_ENDPOINT`). Because environment variables sit above `application.yml` in the precedence chain, the Kubernetes-provided values override the defaults packaged with the app whenever the pod starts.
+
+### End-to-end k3d workflow
+1. **Create the cluster** (exposes backend + frontend NodePorts via k3d’s load balancer):
+   ```bash
+   k3d cluster create finance-service \
+     --port 8080:30080@loadbalancer \
+     --port 3000:30081@loadbalancer
+   ```
+
+2. **Load local images into k3d** (retag the frontend first if the image only exists as `:local`):
+   ```bash
+   docker tag finance-frontend:local finance-frontend:latest  # only if :latest missing
+   k3d image import finance-data-service:latest finance-frontend:latest --cluster finance-service
+   ```
+
+3. **Deploy the chart with Helm** (creates both backend and frontend Deployments/Services):
+   ```bash
+   helm upgrade --install finance charts/finance-data-service \
+     --namespace finance --create-namespace
+   ```
+
+4. **Verify pod health** (backend defaults to two replicas via `replicaCount: 2` and the frontend to one):
+   ```bash
+   kubectl get pods -n finance
+   ```
+   Delete any `ErrImagePull` pods (`kubectl delete pod …`) after importing images so they restart with the cached layers.
 
 If you need a packaged chart tarball for distribution:
 ```bash
 helm package charts/finance-data-service
 ```
 
-### Run the application inside k3d
-If you created the cluster with Option 1, forward the service port whenever you want host access:
-```bash
-kubectl port-forward svc/finance-finance-data-service 8080:8080 -n finance
-# In a second terminal
-curl "http://localhost:8080/getPriceData?symbol=AAPL"
-```
-
-If you created the cluster with Option 2, hit the published NodePort directly:
-```bash
-curl "http://localhost:30080/getPriceData?symbol=AAPL"
-```
-
-Independent of the option, you can always verify networking from within the k3d Docker network without port forwarding:
-```bash
-docker run --rm --network k3d-finance curlimages/curl \
-  curl -sS 'http://k3d-finance-server-0:30080/getPriceData?symbol=AAPL'
-```
-
 ### Cleanup
 When you're finished, remove the release and the cluster:
 ```bash
 helm uninstall finance -n finance
-k3d cluster delete finance
+k3d cluster delete finance-service
 ```
 
 ## LocalStack Secrets Manager Scripts
