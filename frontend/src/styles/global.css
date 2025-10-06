@@ -53,3 +53,8 @@ a {
 .chart-tooltip .values {
   font-family: 'Roboto Mono', monospace;
 }
+
+.chart-tooltip .close {
+  font-weight: 700;
+  color: #facc15;
+}

@@ -149,7 +149,26 @@ function PriceChartPage(): JSX.Element {
         format: 'yyyy-MM-dd'
       },
       custom({ dataPointIndex, w }: TooltipContext) {
-        const dateLabel = w.globals.categoryLabels[dataPointIndex];
+        const categoryLabel = w.globals.categoryLabels?.[dataPointIndex];
+        const fallbackDateValue = w.config.series
+          .map((serie) => {
+            const point = serie.data[dataPointIndex];
+            if (!point) {
+              return undefined;
+            }
+            if (typeof point.x === 'string') {
+              return point.x;
+            }
+            return point.meta?.date ?? undefined;
+          })
+          .find((value): value is string => value !== undefined && value !== null && value !== '');
+
+        const resolvedDate = categoryLabel ?? fallbackDateValue ?? '';
+        const dateObject = resolvedDate ? new Date(resolvedDate) : null;
+        const dateLabel = dateObject && !Number.isNaN(dateObject.getTime())
+          ? dateObject.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
+          : resolvedDate;
+
         const rows = w.config.series
           .map((serie) => {
             const point = serie.data[dataPointIndex];
@@ -159,9 +178,9 @@ function PriceChartPage(): JSX.Element {
             const { meta } = point;
             return `<div class="tooltip-row"><span class="symbol">${serie.name}</span><span class="values">O ${coerceNumber(
               meta.open
-            ).toFixed(2)} · H ${coerceNumber(meta.high).toFixed(2)} · L ${coerceNumber(meta.low).toFixed(2)} · C ${coerceNumber(
+            ).toFixed(2)} · H ${coerceNumber(meta.high).toFixed(2)} · L ${coerceNumber(meta.low).toFixed(2)} · <span class="close">C ${coerceNumber(
               meta.close
-            ).toFixed(2)}</span></div>`;
+            ).toFixed(2)}</span></span></div>`;
           })
           .join('');
 
