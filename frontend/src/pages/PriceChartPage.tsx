@@ -29,9 +29,15 @@ interface TooltipContext {
   w: {
     config: {
       series: ChartSeries[];
+      colors?: string[];
     };
     globals: {
       categoryLabels: string[];
+      colors?: string[];
+      seriesColors?: string[];
+      stroke?: {
+        colors?: string[][];
+      };
     };
   };
 }
@@ -170,13 +176,19 @@ function PriceChartPage(): JSX.Element {
           : resolvedDate;
 
         const rows = w.config.series
-          .map((serie) => {
+          .map((serie, serieIndex) => {
             const point = serie.data[dataPointIndex];
             if (!point?.meta) {
               return '';
             }
             const { meta } = point;
-            return `<div class="tooltip-row"><span class="symbol">${serie.name}</span><span class="values">O ${coerceNumber(
+            const color =
+              w.globals.seriesColors?.[serieIndex] ??
+              w.globals.colors?.[serieIndex] ??
+              w.config.colors?.[serieIndex] ??
+              w.globals.stroke?.colors?.[serieIndex]?.[0] ??
+              '#38bdf8';
+            return `<div class="tooltip-row"><span class="symbol" style="color:${color};">${serie.name}</span><span class="values">O ${coerceNumber(
               meta.open
             ).toFixed(2)} · H ${coerceNumber(meta.high).toFixed(2)} · L ${coerceNumber(meta.low).toFixed(2)} · <span class="close">C ${coerceNumber(
               meta.close
